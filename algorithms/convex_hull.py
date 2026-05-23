@@ -120,22 +120,16 @@ def _edge_change_for_addition(
 ) -> tuple[tuple[int, int] | None, list[tuple[int, int]]]:
     """Compute the removed edge and new edges when adding ``node`` to the hull.
 
-    The hull is treated as a closed polygon for edge bookkeeping: adding a node
-    splits the closing edge (last → first) when extending at either end, or
-    replaces a single edge when inserting between two hull nodes.
+    The hull is an open path during construction, so each step only adds the
+    single new link between ``node`` and the adjacent endpoint it joins.
     """
     if not hull_before:
         return None, []
 
-    if len(hull_before) == 1:
-        a = hull_before[0]
-        return None, [(a, node)]
-
-    first = hull_before[0]
-    last = hull_before[-1]
-
     if action == "prepend":
-        return (last, first), [(node, first), (last, node)]
+        return None, [(node, hull_before[0])]
 
     if action == "append":
-        return (last, first), [(last, node), (node, first)]
+        return None, [(hull_before[-1], node)]
+
+    return None, []
