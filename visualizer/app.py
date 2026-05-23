@@ -83,11 +83,15 @@ class TourVisualizer:
         steps: list[Step],
         instance_name: str,
         variant_name: str,
+        optimal_tour: list[int] | None = None,
+        algorithm_tour: list[int] | None = None,
     ) -> None:
         self.coords = coords.astype(np.float32, copy=False)
         self.steps = steps
         self.instance_name = instance_name
         self.variant_name = variant_name
+        self.optimal_tour = optimal_tour
+        self.algorithm_tour = algorithm_tour
         self.n_nodes = len(coords)
         self.current = 0
         self._autoplay = False
@@ -114,14 +118,22 @@ class TourVisualizer:
         else:
             self._node_size = 30.0
             self._path_width = 1.2
+        self._optimal_path_width = max(
+            self._path_width * 2.5, self._path_width + 2.0,
+        )
 
         self._build_figure()
         self._set_step(0, jump=True)
         self._start_timer()
 
     def _build_figure(self) -> None:
+        self._has_route_previews = (
+            self.optimal_tour is not None and self.algorithm_tour is not None
+        )
         self.fig, self.ax = plt.subplots(figsize=(12, 8))
         self.fig.subplots_adjust(bottom=0.18)
+        if self._has_route_previews:
+            self.ax.set_position([0.06, 0.18, 0.68, 0.76])
 
         title = f"{self.variant_name}  ·  {self.instance_name}  ({self.n_nodes} nodes)"
         if self.fig.canvas.manager is not None:
@@ -148,6 +160,13 @@ class TourVisualizer:
                 )
 
         empty = np.empty((0, 2, 2), dtype=np.float32)
+        self._optimal_lc = LineCollection(
+            empty,
+            colors="#999999",
+            linewidths=self._optimal_path_width,
+            alpha=0.35,
+            zorder=1,
+        )
         self._blue_lc = LineCollection(
             empty, colors="#4477cc", linewidths=self._path_width, zorder=3,
         )
@@ -161,6 +180,7 @@ class TourVisualizer:
             [], [], s=max(self._node_size * 4, 80), color="#dd2222", zorder=6, linewidths=0,
         )
 
+        self.ax.add_collection(self._optimal_lc)
         self.ax.add_collection(self._blue_lc)
         self.ax.add_collection(self._removed_lc)
         self.ax.add_collection(self._new_lc)
@@ -187,7 +207,17 @@ class TourVisualizer:
             mpatches.Patch(color="#ff8800", label="New edge(s)"),
             mpatches.Patch(color="#dd2222", label="Added node"),
         ]
+        if self.optimal_tour is not None:
+            handles.append(
+                mpatches.Patch(
+                    color="#999999", alpha=0.35, label="Known shortest route",
+                ),
+            )
         self.ax.legend(handles=handles, loc="upper right", fontsize=8, framealpha=0.7)
+
+        self._route_preview_axes: list[plt.Axes] = []
+        if self._has_route_previews:
+            self._build_route_previews()
 
         btn_y, btn_h = 0.04, 0.06
         self.btn_first = Button(self.fig.add_axes([0.05, btn_y, 0.08, btn_h]), "|◀")
@@ -204,6 +234,55 @@ class TourVisualizer:
 
         self.fig.canvas.mpl_connect("key_press_event", self._on_key)
         self.fig.canvas.mpl_connect("close_event", self._on_close)
+
+    def _build_route_previews(self) -> None:
+        thumb_w, thumb_h = 0.20, 0.36
+        thumb_x = 0.77
+        node_size = 1.0 if self._large_map else 6.0
+        path_width = max(self._path_width * 0.7, 0.4)
+        optimal_width = max(self._optimal_path_width * 0.7, path_width + 0.6)
+
+        specs = [
+            ("Algorithm route", self.algorithm_tour, "algorithm", thumb_x, 0.54),
+            ("Known shortest", self.optimal_tour, "optimal", thumb_x, 0.20),
+        ]
+        for title, tour, style, x, y in specs:
+            ax = self.fig.add_axes([x, y, thumb_w, thumb_h])
+            ax.set_xlim(self._xlim)
+            ax.set_ylim(self._ylim)
+            ax.set_aspect("equal", adjustable="box")
+            ax.axis("off")
+            ax.set_title(title, fontsize=8, pad=3)
+            ax.scatter(
+                self.coords[:, 0], self.coords[:, 1],
+                s=node_size, color="#aaaaaa", linewidths=0, zorder=2,
+            )
+            segments = self._tour_to_segments(tour)
+            if style == "algorithm":
+                lc = LineCollection(
+                    segments,
+                    colors="#4477cc",
+                    linewidths=path_width,
+                    zorder=3,
+                )
+            else:
+                lc = LineCollection(
+                    segments,
+                    colors="#999999",
+                    linewidths=optimal_width,
+                    alpha=0.35,
+                    zorder=3,
+                )
+            ax.add_collection(lc)
+            self._route_preview_axes.append(ax)
+
+    def _tour_to_segments(self, tour: list[int] | None) -> np.ndarray:
+        if not tour:
+            return np.empty((0, 2, 2), dtype=np.float32)
+        n = len(tour)
+        a = np.array(tour, dtype=np.intp)
+        b = np.array([tour[(i + 1) % n] for i in range(n)], dtype=np.intp)
+        return np.stack([self.coords[a], self.coords[b]], axis=1)
 
     def _edges_to_segments(self, edges: set[tuple[int, int]]) -> np.ndarray:
         if not edges:
@@ -286,13 +365,38 @@ class TourVisualizer:
 
     def _refresh(self) -> None:
         step = self.steps[self.current]
+        on_final = self.current == len(self.steps) - 1
 
-        self._blue_lc.set_segments(self._blue_edges.segments())
+        if on_final:
+            self._commit_previous_highlights()
+
+        comparing = on_final and self.optimal_tour is not None
+        blue_segments = self._blue_edges.segments()
+        if comparing:
+            algo_segments = (
+                self._tour_to_segments(self.algorithm_tour)
+                if self.algorithm_tour is not None
+                else blue_segments
+            )
+            self._optimal_lc.set_segments(
+                self._tour_to_segments(self.optimal_tour),
+            )
+            self._blue_lc.set_segments(algo_segments)
+            self._optimal_lc.set_visible(True)
+        else:
+            self._blue_lc.set_segments(blue_segments)
+            self._optimal_lc.set_visible(False)
+
         self._removed_lc.set_segments(
             self._edges_to_segments({self._highlight_removed})
-            if self._highlight_removed else np.empty((0, 2, 2), dtype=np.float32)
+            if self._highlight_removed and not on_final
+            else np.empty((0, 2, 2), dtype=np.float32)
         )
-        self._new_lc.set_segments(self._edges_to_segments(self._highlight_new))
+        self._new_lc.set_segments(
+            self._edges_to_segments(self._highlight_new)
+            if not on_final
+            else np.empty((0, 2, 2), dtype=np.float32)
+        )
 
         if step.node >= 0:
             self._active_artist.set_offsets(self.coords[step.node : step.node + 1])
@@ -376,9 +480,9 @@ def main() -> None:
     map_dir = os.path.join(_ROOT, "datasets/map")
     print(f"Loading {args.instance} ...")
     if os.path.exists(os.path.join(map_dir, f"{args.instance}.tsp")):
-        coords, dist, optimal_cost = load_instance(args.instance, map_dir)
+        coords, dist, optimal_cost, optimal_tour = load_instance(args.instance, map_dir)
     else:
-        coords, dist, optimal_cost = load_instance(args.instance, tsp_dir)
+        coords, dist, optimal_cost, optimal_tour = load_instance(args.instance, tsp_dir)
 
     print(f"Running hull + {args.variant} on {args.instance} ({len(coords)} nodes) ...")
     if len(coords) > 200:
@@ -401,7 +505,10 @@ def main() -> None:
     print(f"Solve+trace: {solve_time:.1f}s")
     print("\nControls:  ← / → step  |  Space play  |  +/- speed  |  Q quit")
 
-    TourVisualizer(coords, steps, args.instance, args.variant)
+    TourVisualizer(
+        coords, steps, args.instance, args.variant,
+        optimal_tour=optimal_tour, algorithm_tour=tour,
+    )
     plt.show()
 
 

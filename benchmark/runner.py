@@ -79,7 +79,7 @@ def run_variant(variant_name: str, tsp_dir: str) -> dict:
     instance_results: dict[str, dict] = {}
 
     for instance_name in TEST_INSTANCES:
-        coords, dist, optimal_cost = load_instance(instance_name, tsp_dir)
+        coords, dist, optimal_cost, _ = load_instance(instance_name, tsp_dir)
 
         t0 = time.perf_counter()
         tour = solve_variant(variant_name, dist, coords)

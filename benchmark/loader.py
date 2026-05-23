@@ -13,7 +13,7 @@ import tsplib95
 def load_instance(
     name: str,
     tsp_dir: str,
-) -> tuple[np.ndarray, np.ndarray, float | None]:
+) -> tuple[np.ndarray, np.ndarray, float | None, list[int] | None]:
     """Load a TSPLIB instance by stem name (e.g. ``"berlin52"``).
 
     Parameters
@@ -31,6 +31,9 @@ def load_instance(
         N×N float64 array, 0-based.
     optimal_cost:
         Total length of the known-optimal tour, or ``None`` if no
+        ``.opt.tour`` file is present.
+    optimal_tour:
+        0-based node order of the known-optimal tour, or ``None`` if no
         ``.opt.tour`` file is present.
     """
     tsp_path = os.path.join(tsp_dir, f"{name}.tsp")
@@ -53,13 +56,17 @@ def load_instance(
 
     # Load optimal tour if the .opt.tour file exists.
     optimal_cost: float | None = None
+    optimal_tour: list[int] | None = None
     opt_path = os.path.join(tsp_dir, f"{name}.opt.tour")
     if os.path.exists(opt_path):
         opt_problem = tsplib95.load(opt_path)
         opt_tour_1based = opt_problem.tours[0]           # 1-based node IDs
-        opt_tour = [node - 1 for node in opt_tour_1based]  # → 0-based
+        optimal_tour = [node - 1 for node in opt_tour_1based]  # → 0-based
         optimal_cost = float(
-            sum(dist[opt_tour[i]][opt_tour[(i + 1) % n]] for i in range(n))
+            sum(
+                dist[optimal_tour[i]][optimal_tour[(i + 1) % n]]
+                for i in range(n)
+            )
         )
 
-    return coords, dist, optimal_cost
+    return coords, dist, optimal_cost, optimal_tour
