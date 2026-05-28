@@ -418,6 +418,415 @@ def _in_segment(idx: int, seg_start: int, seg_end: int, n: int) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Compound local search: alternating 2-opt and Or-opt to joint convergence
+# ---------------------------------------------------------------------------
+
+def compound_local_search(
+    tour: list[int],
+    dist,
+    or_opt_chain_lengths: tuple[int, ...] = (1, 2, 3),
+    max_outer: int = 50,
+) -> tuple[list[int], list[TraceStep]]:
+    """Alternate 2-opt and Or-opt until neither produces any improvement.
+
+    Either local search may free up the other (Or-opt relocations create
+    new crossings 2-opt can fix, and 2-opt rearrangements expose new
+    relocation gains for Or-opt). Running them to mutual convergence is
+    a classical "VND" (Variable Neighbourhood Descent) strategy.
+    """
+    tour = list(tour)
+    all_steps: list[TraceStep] = []
+    last_cost = compute_tour_cost(tour, dist)
+    for _ in range(max_outer):
+        tour, two_steps = two_opt(tour, dist)
+        tour, or_steps = or_opt(tour, dist, or_opt_chain_lengths)
+        all_steps.extend(two_steps)
+        all_steps.extend(or_steps)
+        new_cost = compute_tour_cost(tour, dist)
+        if new_cost >= last_cost - 1e-9:
+            break
+        last_cost = new_cost
+    return tour, all_steps
+
+
+# ---------------------------------------------------------------------------
+# 3-opt local search (sequential first-improvement on edge triples)
+# ---------------------------------------------------------------------------
+
+def three_opt(
+    tour: list[int],
+    dist,
+    max_passes: int = 30,
+) -> tuple[list[int], list[TraceStep]]:
+    """Sequential 3-opt: try every triple of edges, accept any improving move.
+
+    For each triple of *non-adjacent* edges (a-b), (c-d), (e-f) (in tour
+    order) we consider the 7 possible reconnections (the trivial one is
+    the identity). The single one that reduces the tour length the most
+    is applied. Run repeatedly until no improving triple exists.
+
+    NOTE: this is O(n³) per pass, so we cap ``max_passes`` and rely on
+    early-termination when no improvement appears.
+    """
+    tour = list(tour)
+    n = len(tour)
+    steps: list[TraceStep] = []
+    for _pass in range(max_passes):
+        improved = False
+        for i in range(n - 2):
+            a_idx = i
+            b_idx = i + 1
+            for j in range(i + 1, n - 1):
+                c_idx = j
+                d_idx = j + 1
+                for k in range(j + 1, n + (0 if i > 0 else -1)):
+                    e_idx = k
+                    f_idx = (k + 1) % n
+                    if f_idx == a_idx:
+                        continue
+                    a, b = tour[a_idx], tour[b_idx]
+                    c, d = tour[c_idx], tour[d_idx]
+                    e, f = tour[e_idx], tour[f_idx]
+                    d_old = dist[a][b] + dist[c][d] + dist[e][f]
+                    # 7 non-trivial reconnections; pick best.
+                    cases = [
+                        # Each tuple: (new tour middle segments order, cost)
+                        # cost = ab + cd + ef → new edges
+                        (1, dist[a][c] + dist[b][d] + dist[e][f]),       # reverse seg1
+                        (2, dist[a][b] + dist[c][e] + dist[d][f]),       # reverse seg2
+                        (3, dist[a][c] + dist[b][e] + dist[d][f]),       # reverse seg1+seg2
+                        (4, dist[a][d] + dist[e][b] + dist[c][f]),       # 3-opt move
+                        (5, dist[a][e] + dist[d][b] + dist[c][f]),       # 3-opt move
+                        (6, dist[a][d] + dist[e][c] + dist[b][f]),       # 3-opt move
+                        (7, dist[a][e] + dist[d][c] + dist[b][f]),       # 3-opt move
+                    ]
+                    best_case, best_cost = min(cases, key=lambda x: x[1])
+                    delta = best_cost - d_old
+                    if delta < -1e-9:
+                        seg1 = tour[b_idx: d_idx]
+                        seg2 = tour[d_idx: f_idx if f_idx > d_idx else n]
+                        # Apply chosen reconnection.
+                        new_middle = _apply_3opt_case(
+                            best_case, seg1, seg2
+                        )
+                        # Replace tour[b_idx : f_idx] with new_middle (handling wrap).
+                        if f_idx > b_idx:
+                            tour[b_idx: f_idx] = new_middle
+                        else:
+                            # f_idx wraps to 0 — replace tour[b_idx:] entirely
+                            tour[b_idx:] = new_middle
+                        steps.append(TraceStep(
+                            node=b,
+                            inserted_after=a,
+                            removed_edge=(a, b),
+                            new_edges=[(a, tour[b_idx])],
+                            description=(
+                                f"3-opt case {best_case}: Δ={delta:.2f}"
+                            ),
+                        ))
+                        improved = True
+                        break
+                if improved:
+                    break
+            if improved:
+                break
+        if not improved:
+            break
+    return tour, steps
+
+
+def _apply_3opt_case(
+    case: int,
+    seg1: list[int],
+    seg2: list[int],
+) -> list[int]:
+    """Return the middle of the tour after applying 3-opt ``case``.
+
+    Cases 1..7 follow the standard enumeration:
+      1: reverse seg1
+      2: reverse seg2
+      3: reverse seg1 and seg2 individually
+      4: swap segments (seg2 then seg1)
+      5: seg2 then reversed seg1
+      6: reversed seg2 then seg1
+      7: reversed seg2 then reversed seg1
+    """
+    rs1 = list(reversed(seg1))
+    rs2 = list(reversed(seg2))
+    if case == 1:
+        return rs1 + seg2
+    if case == 2:
+        return seg1 + rs2
+    if case == 3:
+        return rs1 + rs2
+    if case == 4:
+        return seg2 + seg1
+    if case == 5:
+        return seg2 + rs1
+    if case == 6:
+        return rs2 + seg1
+    if case == 7:
+        return rs2 + rs1
+    return seg1 + seg2
+
+
+# ---------------------------------------------------------------------------
+# Double-bridge perturbation (classic ILS kick move)
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Neighbor-list-based fast local search (much faster on large instances)
+# ---------------------------------------------------------------------------
+
+def build_neighbor_lists(dist, k: int = 20) -> list[list[int]]:
+    """For each node, return the k nearest nodes (ascending distance)."""
+    n = len(dist)
+    arr = np.asarray(dist)
+    # argpartition is O(n) per row; we then sort only the top k.
+    nb = np.empty((n, k), dtype=np.int64)
+    for i in range(n):
+        idx = np.argpartition(arr[i], k + 1)[: k + 1]
+        idx = idx[idx != i][:k]
+        order = np.argsort(arr[i, idx])
+        nb[i] = idx[order]
+    return nb.tolist()
+
+
+def two_opt_neighbors(
+    tour: list[int],
+    dist,
+    neighbors: list[list[int]],
+    max_passes: int = 200,
+) -> list[int]:
+    """First-improvement 2-opt restricted to k-nearest-neighbour edges.
+
+    Classical 2-opt examines O(n²) pairs per pass. Restricting the
+    "incoming" endpoint to a node's nearest-k neighbour list keeps the
+    asymptotic per-pass cost at O(n·k), which is up to 20× faster on
+    n=280 with k=20 while retaining most of the improvement opportunities
+    (an improving 2-opt move almost always involves a near-neighbour edge).
+    """
+    tour = list(tour)
+    n = len(tour)
+    pos = [0] * n
+    for i, node in enumerate(tour):
+        pos[node] = i
+    dont_look = [False] * n
+
+    for _ in range(max_passes):
+        improved = False
+        for a in range(n):
+            if dont_look[a]:
+                continue
+            local_improved = False
+            i = pos[a]
+            b = tour[(i + 1) % n]
+            d_ab = dist[a][b]
+            for c in neighbors[a]:
+                if c == a or c == b:
+                    continue
+                d_ac = dist[a][c]
+                if d_ac >= d_ab:
+                    # Sorted neighbours: further ones can only be worse.
+                    break
+                j = pos[c]
+                # 2-opt: remove (a,b) and (c,d), add (a,c) and (b,d).
+                d_node = tour[(j + 1) % n]
+                if d_node == a:
+                    continue
+                d_cd = dist[c][d_node]
+                delta = d_ac + dist[b][d_node] - d_ab - d_cd
+                if delta < -1e-12:
+                    # Reverse tour[i+1 .. j] (handling wrap correctly).
+                    _reverse_segment(tour, (i + 1) % n, j, pos)
+                    dont_look[a] = False
+                    dont_look[b] = False
+                    dont_look[c] = False
+                    dont_look[d_node] = False
+                    improved = True
+                    local_improved = True
+                    break
+            if not local_improved:
+                dont_look[a] = True
+        if not improved:
+            break
+    return tour
+
+
+def or_opt_neighbors(
+    tour: list[int],
+    dist,
+    neighbors: list[list[int]],
+    chain_lengths: tuple[int, ...] = (1, 2, 3),
+    max_passes: int = 200,
+) -> list[int]:
+    """Or-opt restricted to nearest-neighbour insertion targets.
+
+    For each segment ``[s_first .. s_last]`` of length ``L``, the
+    re-insertion target ``(p, q)`` is constrained so ``p`` is one of
+    ``s_first``'s nearest neighbours, drastically reducing the
+    O(n²·L) classical scan to O(n·k·L).
+    """
+    tour = list(tour)
+    n = len(tour)
+    pos = [0] * n
+    for i, node in enumerate(tour):
+        pos[node] = i
+
+    for _ in range(max_passes):
+        improved = False
+        for L in chain_lengths:
+            if L >= n - 1:
+                continue
+            for s_first in range(n):
+                # Compute segment indices via pos[].
+                seg_start_idx = pos[s_first]
+                seg_end_idx = (seg_start_idx + L - 1) % n
+                prev_idx = (seg_start_idx - 1) % n
+                next_idx = (seg_end_idx + 1) % n
+                a = tour[prev_idx]
+                s_last = tour[seg_end_idx]
+                b = tour[next_idx]
+                if a == s_last or b == s_first:
+                    continue
+                removed_cost = (
+                    dist[a][s_first] + dist[s_last][b] - dist[a][b]
+                )
+                if removed_cost <= 1e-12:
+                    continue
+
+                best_delta = -1e-12
+                best_p_idx = -1
+                best_rev = False
+
+                # Candidate insertion targets near s_first or s_last.
+                candidates = set(neighbors[s_first]) | set(neighbors[s_last])
+                for p in candidates:
+                    if p == s_first or p == s_last or p == a:
+                        continue
+                    j = pos[p]
+                    if _in_segment(j, seg_start_idx, seg_end_idx, n):
+                        continue
+                    q = tour[(j + 1) % n]
+                    if q == s_first or _in_segment(
+                        (j + 1) % n, seg_start_idx, seg_end_idx, n
+                    ):
+                        continue
+                    pq = dist[p][q]
+                    ins_fwd = dist[p][s_first] + dist[s_last][q] - pq
+                    ins_rev = dist[p][s_last] + dist[s_first][q] - pq
+                    delta_fwd = ins_fwd - removed_cost
+                    delta_rev = ins_rev - removed_cost
+                    if delta_fwd < best_delta:
+                        best_delta = delta_fwd
+                        best_p_idx = j
+                        best_rev = False
+                    if delta_rev < best_delta:
+                        best_delta = delta_rev
+                        best_p_idx = j
+                        best_rev = True
+
+                if best_p_idx >= 0:
+                    segment = [
+                        tour[(seg_start_idx + k) % n] for k in range(L)
+                    ]
+                    if best_rev:
+                        segment = list(reversed(segment))
+                    # Remove segment from tour.
+                    if seg_start_idx <= seg_end_idx:
+                        del tour[seg_start_idx: seg_end_idx + 1]
+                    else:
+                        del tour[seg_start_idx:]
+                        del tour[: seg_end_idx + 1]
+                    new_n = len(tour)
+                    # Refresh insertion index (positions shifted).
+                    if seg_start_idx <= seg_end_idx and best_p_idx > seg_end_idx:
+                        new_p = best_p_idx - L
+                    else:
+                        new_p = best_p_idx
+                    if new_p < 0:
+                        new_p += new_n
+                    for off, node in enumerate(segment):
+                        tour.insert(new_p + 1 + off, node)
+                    n = len(tour)
+                    pos = [0] * n
+                    for i, node in enumerate(tour):
+                        pos[node] = i
+                    improved = True
+                    break  # restart outer scan
+            if improved:
+                break
+        if not improved:
+            break
+    return tour
+
+
+def _reverse_segment(tour: list[int], start: int, end: int, pos: list[int]) -> None:
+    """In-place reverse of ``tour[start..end]`` (inclusive), updating pos[].
+
+    Handles wrap-around (start > end means the segment wraps past index 0).
+    """
+    n = len(tour)
+    if start <= end:
+        length = end - start + 1
+    else:
+        length = (n - start) + end + 1
+    for k in range(length // 2):
+        i = (start + k) % n
+        j = (end - k) % n
+        tour[i], tour[j] = tour[j], tour[i]
+        pos[tour[i]] = i
+        pos[tour[j]] = j
+
+
+def fast_local_search(
+    tour: list[int],
+    dist,
+    neighbors: list[list[int]],
+    or_opt_chain_lengths: tuple[int, ...] = (1, 2, 3, 4, 5),
+    max_outer: int = 30,
+) -> list[int]:
+    """Alternate neighbor-restricted 2-opt and Or-opt to joint convergence.
+
+    Much faster than the full O(n²) loops in compound_local_search, and
+    on Euclidean instances produces tours of essentially the same quality
+    (the missed moves are dominated by long-edge swaps that rarely improve).
+    """
+    tour = list(tour)
+    last_cost = compute_tour_cost(tour, dist)
+    for _ in range(max_outer):
+        tour = two_opt_neighbors(tour, dist, neighbors)
+        tour = or_opt_neighbors(tour, dist, neighbors, or_opt_chain_lengths)
+        new_cost = compute_tour_cost(tour, dist)
+        if new_cost >= last_cost - 1e-9:
+            break
+        last_cost = new_cost
+    return tour
+
+
+def double_bridge(tour: list[int], rng: np.random.Generator) -> list[int]:
+    """Apply a double-bridge 4-opt perturbation that no 2-opt or 3-opt can
+    undo in a single move. Splits the tour at four random points and
+    reconnects the four resulting segments in the swapped order
+    ``A + C + B + D``.
+
+    Standard kick move in Iterated Local Search literature; it diversifies
+    enough to escape the current LS basin while preserving most of the
+    tour structure.
+    """
+    n = len(tour)
+    if n < 8:
+        return list(tour)
+    p = sorted(rng.choice(range(1, n), size=3, replace=False).tolist())
+    p1, p2, p3 = p
+    A = tour[:p1]
+    B = tour[p1:p2]
+    C = tour[p2:p3]
+    D = tour[p3:]
+    return A + C + B + D
+
+
+# ---------------------------------------------------------------------------
 # Geometric primitives
 # ---------------------------------------------------------------------------
 
@@ -514,6 +923,13 @@ __all__ = [
     "merge_two_polygons",
     "two_opt",
     "or_opt",
+    "compound_local_search",
+    "three_opt",
+    "double_bridge",
+    "build_neighbor_lists",
+    "two_opt_neighbors",
+    "or_opt_neighbors",
+    "fast_local_search",
     "perpendicular_distance_to_segment",
     "distance_to_segment",
     "min_distance_to_hull",
