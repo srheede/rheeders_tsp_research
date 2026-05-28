@@ -1,0 +1,102 @@
+{
+  "variant": "v03_regret_insertion",
+  "timestamp": "2026-05-28T18:32:03.783968+00:00",
+  "instances": {
+    "ulysses22": {
+      "cost": 7128.0,
+      "optimal_cost": 7013.0,
+      "gap_pct": 1.6398,
+      "time_sec": 0.001041,
+      "n_nodes": 22
+    },
+    "bayg29": {
+      "cost": 1632.0,
+      "optimal_cost": 1610.0,
+      "gap_pct": 1.3665,
+      "time_sec": 0.002481,
+      "n_nodes": 29
+    },
+    "att48": {
+      "cost": 10949.0,
+      "optimal_cost": 10628.0,
+      "gap_pct": 3.0203,
+      "time_sec": 0.010127,
+      "n_nodes": 48
+    },
+    "eil51": {
+      "cost": 443.0,
+      "optimal_cost": 426.0,
+      "gap_pct": 3.9906,
+      "time_sec": 0.016848,
+      "n_nodes": 51
+    },
+    "berlin52": {
+      "cost": 7885.0,
+      "optimal_cost": 7542.0,
+      "gap_pct": 4.5479,
+      "time_sec": 0.016134,
+      "n_nodes": 52
+    },
+    "st70": {
+      "cost": 697.0,
+      "optimal_cost": 675.0,
+      "gap_pct": 3.2593,
+      "time_sec": 0.042591,
+      "n_nodes": 70
+    },
+    "eil76": {
+      "cost": 576.0,
+      "optimal_cost": 538.0,
+      "gap_pct": 7.0632,
+      "time_sec": 0.054587,
+      "n_nodes": 76
+    },
+    "gr96": {
+      "cost": 57946.0,
+      "optimal_cost": 55209.0,
+      "gap_pct": 4.9575,
+      "time_sec": 0.091667,
+      "n_nodes": 96
+    },
+    "kroA100": {
+      "cost": 21578.0,
+      "optimal_cost": 21282.0,
+      "gap_pct": 1.3908,
+      "time_sec": 0.126118,
+      "n_nodes": 100
+    },
+    "lin105": {
+      "cost": 14634.0,
+      "optimal_cost": 14379.0,
+      "gap_pct": 1.7734,
+      "time_sec": 0.1412,
+      "n_nodes": 105
+    },
+    "ch130": {
+      "cost": 6621.0,
+      "optimal_cost": 6110.0,
+      "gap_pct": 8.3633,
+      "time_sec": 0.274617,
+      "n_nodes": 130
+    },
+    "tsp225": {
+      "cost": 4111.0,
+      "optimal_cost": 3916.0,
+      "gap_pct": 4.9796,
+      "time_sec": 1.395652,
+      "n_nodes": 225
+    },
+    "a280": {
+      "cost": 2828.0,
+      "optimal_cost": 2579.0,
+      "gap_pct": 9.6549,
+      "time_sec": 2.890027,
+      "n_nodes": 280
+    }
+  },
+  "summary": {
+    "avg_gap_pct": 4.3082,
+    "total_time_sec": 5.06309,
+    "instances_with_optimal": 13
+  }
+}

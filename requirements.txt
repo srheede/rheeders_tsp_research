@@ -1,5 +1,6 @@
 tsplib95>=0.7.1
 numpy>=1.24
+scipy>=1.10
 matplotlib>=3.7
 pandas>=2.0
 jupyter>=1.0
