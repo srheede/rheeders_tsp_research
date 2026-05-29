@@ -11,20 +11,16 @@ coverage across problem scales.
 
 # Instances from datasets/tsp/ to run every variant against.
 # Format: filename stem (no extension).
+#
+# This suite focuses on LARGER instances (150–666 nodes) — the suite of
+# v01..v32 measurements lives in the json result files for the prior
+# (22–280) suite. All instances below have known-optimal tours.
 TEST_INSTANCES = [
-    "ulysses22",   # 22 nodes  — GEO coords
-    "bayg29",      # 29 nodes  — EXPLICIT, display_data coords
-    "att48",       # 48 nodes  — ATT coords
-    "eil51",       # 51 nodes  — EUC_2D
-    "berlin52",    # 52 nodes  — EUC_2D
-    "st70",        # 70 nodes  — EUC_2D
-    "eil76",       # 76 nodes  — EUC_2D
-    "gr96",        # 96 nodes  — GEO coords
-    "kroA100",     # 100 nodes — EUC_2D
-    "lin105",      # 105 nodes — EUC_2D
-    "ch130",       # 130 nodes — EUC_2D
-    "tsp225",      # 225 nodes — EUC_2D
-    "a280",        # 280 nodes — EUC_2D
+    "a280",        #  280 nodes — EUC_2D    (sanity check, was 0% on v37)
+    "pcb442",      #  442 nodes — EUC_2D    (was 0% on v37)
+    "gr666",       #  666 nodes — GEO       (was 0.05% on v37)
+    "pr1002",      # 1002 nodes — EUC_2D    (HUGE)
+    "pr2392",      # 2392 nodes — EUC_2D    (HUGE)
 ]
 
 # Directory (relative to project root) where .tsp and .opt.tour files live.

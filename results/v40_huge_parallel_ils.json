@@ -1,0 +1,46 @@
+{
+  "variant": "v40_huge_parallel_ils",
+  "timestamp": "2026-05-29T01:17:38.982119+00:00",
+  "instances": {
+    "a280": {
+      "cost": 2579.0,
+      "optimal_cost": 2579.0,
+      "gap_pct": 0.0,
+      "time_sec": 83.779364,
+      "n_nodes": 280
+    },
+    "pcb442": {
+      "cost": 50778.0,
+      "optimal_cost": 50778.0,
+      "gap_pct": 0.0,
+      "time_sec": 513.882679,
+      "n_nodes": 442
+    },
+    "gr666": {
+      "cost": 294537.0,
+      "optimal_cost": 294358.0,
+      "gap_pct": 0.0608,
+      "time_sec": 1092.002243,
+      "n_nodes": 666
+    },
+    "pr1002": {
+      "cost": 260148.0,
+      "optimal_cost": 259045.0,
+      "gap_pct": 0.4258,
+      "time_sec": 1986.336528,
+      "n_nodes": 1002
+    },
+    "pr2392": {
+      "cost": 380643.0,
+      "optimal_cost": 378032.0,
+      "gap_pct": 0.6907,
+      "time_sec": 2272.990865,
+      "n_nodes": 2392
+    }
+  },
+  "summary": {
+    "avg_gap_pct": 0.2355,
+    "total_time_sec": 5948.991679,
+    "instances_with_optimal": 5
+  }
+}

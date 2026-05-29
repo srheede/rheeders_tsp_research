@@ -1,0 +1,46 @@
+{
+  "variant": "v43_native_xxl",
+  "timestamp": "2026-05-29T04:22:00.134507+00:00",
+  "instances": {
+    "a280": {
+      "cost": 2579.0,
+      "optimal_cost": 2579.0,
+      "gap_pct": 0.0,
+      "time_sec": 62.639923,
+      "n_nodes": 280
+    },
+    "pcb442": {
+      "cost": 50778.0,
+      "optimal_cost": 50778.0,
+      "gap_pct": 0.0,
+      "time_sec": 445.878093,
+      "n_nodes": 442
+    },
+    "gr666": {
+      "cost": 294478.0,
+      "optimal_cost": 294358.0,
+      "gap_pct": 0.0408,
+      "time_sec": 747.016875,
+      "n_nodes": 666
+    },
+    "pr1002": {
+      "cost": 259045.0,
+      "optimal_cost": 259045.0,
+      "gap_pct": 0.0,
+      "time_sec": 2484.895292,
+      "n_nodes": 1002
+    },
+    "pr2392": {
+      "cost": 378981.0,
+      "optimal_cost": 378032.0,
+      "gap_pct": 0.251,
+      "time_sec": 1723.838254,
+      "n_nodes": 2392
+    }
+  },
+  "summary": {
+    "avg_gap_pct": 0.0584,
+    "total_time_sec": 5464.268437,
+    "instances_with_optimal": 5
+  }
+}

@@ -1,53 +1,53 @@
 {
-  "variant": "v32_multistart_ils",
-  "timestamp": "2026-05-28T20:13:47.116060+00:00",
+  "variant": "v33_adaptive_ils",
+  "timestamp": "2026-05-28T21:04:13.291249+00:00",
   "instances": {
     "ch150": {
       "cost": 6528.0,
       "optimal_cost": 6528.0,
       "gap_pct": 0.0,
-      "time_sec": 56.593006,
+      "time_sec": 26.557676,
       "n_nodes": 150
     },
     "gr202": {
-      "cost": 40227.0,
+      "cost": 40160.0,
       "optimal_cost": 40160.0,
-      "gap_pct": 0.1668,
-      "time_sec": 172.638266,
+      "gap_pct": 0.0,
+      "time_sec": 108.675239,
       "n_nodes": 202
     },
     "tsp225": {
       "cost": 3916.0,
       "optimal_cost": 3916.0,
       "gap_pct": 0.0,
-      "time_sec": 166.674958,
+      "time_sec": 95.906646,
       "n_nodes": 225
     },
     "a280": {
       "cost": 2579.0,
       "optimal_cost": 2579.0,
       "gap_pct": 0.0,
-      "time_sec": 135.534501,
+      "time_sec": 91.649374,
       "n_nodes": 280
     },
     "pcb442": {
-      "cost": 51129.0,
+      "cost": 50822.0,
       "optimal_cost": 50778.0,
-      "gap_pct": 0.6912,
-      "time_sec": 306.3802,
+      "gap_pct": 0.0867,
+      "time_sec": 351.850853,
       "n_nodes": 442
     },
     "gr666": {
-      "cost": 298359.0,
+      "cost": 294838.0,
       "optimal_cost": 294358.0,
-      "gap_pct": 1.3592,
-      "time_sec": 727.594194,
+      "gap_pct": 0.1631,
+      "time_sec": 902.001752,
       "n_nodes": 666
     }
   },
   "summary": {
-    "avg_gap_pct": 0.3695,
-    "total_time_sec": 1565.415125,
+    "avg_gap_pct": 0.0416,
+    "total_time_sec": 1576.64154,
     "instances_with_optimal": 6
   }
 }
