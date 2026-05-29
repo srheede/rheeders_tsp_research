@@ -1,0 +1,46 @@
+{
+  "variant": "v44_native_ils_full",
+  "timestamp": "2026-05-29T05:40:30.128247+00:00",
+  "instances": {
+    "a280": {
+      "cost": 2579.0,
+      "optimal_cost": 2579.0,
+      "gap_pct": 0.0,
+      "time_sec": 41.836966,
+      "n_nodes": 280
+    },
+    "pcb442": {
+      "cost": 50778.0,
+      "optimal_cost": 50778.0,
+      "gap_pct": 0.0,
+      "time_sec": 115.017816,
+      "n_nodes": 442
+    },
+    "gr666": {
+      "cost": 294358.0,
+      "optimal_cost": 294358.0,
+      "gap_pct": 0.0,
+      "time_sec": 429.529373,
+      "n_nodes": 666
+    },
+    "pr1002": {
+      "cost": 259045.0,
+      "optimal_cost": 259045.0,
+      "gap_pct": 0.0,
+      "time_sec": 658.360497,
+      "n_nodes": 1002
+    },
+    "pr2392": {
+      "cost": 378713.0,
+      "optimal_cost": 378032.0,
+      "gap_pct": 0.1801,
+      "time_sec": 628.877631,
+      "n_nodes": 2392
+    }
+  },
+  "summary": {
+    "avg_gap_pct": 0.036,
+    "total_time_sec": 1873.622283,
+    "instances_with_optimal": 5
+  }
+}

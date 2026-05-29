@@ -1,0 +1,133 @@
+"""
+v45_native_ils_xl — v44's all-C parallel ILS with an enlarged budget for
+the largest instances.
+
+v44 brought 4 / 5 of the huge suite to the proven optimum (a280, pcb442,
+gr666, pr1002) in a third of v43's runtime; only pr2392 (2392 nodes)
+remained, at 0.18%. pr2392's gap has shrunk monotonically with budget
+(0.69 → 0.28 → 0.25 → 0.18), so v45 simply spends more of the (now very
+cheap) ILS iterations on the n > 1200 bracket. Everything else is
+identical to v44.
+"""
+
+from __future__ import annotations
+
+import multiprocessing as mp
+import os
+import numpy as np
+
+from algorithms.protocol import TraceStep
+from algorithms import v01_baseline
+from algorithms._helpers import (
+    fast_cheapest_insertion,
+    build_neighbor_lists,
+    compound_local_search,
+    compute_tour_cost,
+)
+from algorithms._ls_native import ils_run_c
+
+
+_NEIGHBOR_K = 20
+_OR_OPT_LENGTHS = (1, 2, 3, 4, 5)
+_BASE_SEED = 0xC0FFEE
+
+
+def _budget(n: int) -> tuple[int, int]:
+    """(chains, iterations_per_chain). Chains = logical cores (16)."""
+    if n <= 300:
+        return 16, 60000
+    if n <= 500:
+        return 16, 80000
+    if n <= 700:
+        return 16, 150000
+    if n <= 1200:
+        return 16, 150000
+    if n <= 2000:
+        return 16, 150000
+    return 16, 200000
+
+
+def solve_from_hull(
+    hull: list[int],
+    remaining: list[int],
+    distance_matrix: np.ndarray,
+    coords: np.ndarray | None = None,
+) -> list[int]:
+    n_total = len(hull) + len(remaining)
+    if n_total <= 600:
+        tour = v01_baseline.solve_from_hull(
+            hull, remaining, distance_matrix, coords
+        )
+    else:
+        tour = fast_cheapest_insertion(hull, remaining, distance_matrix)
+    return _parallel_native_ils(tour, distance_matrix)
+
+
+def solve_from_hull_traced(
+    hull: list[int],
+    remaining: list[int],
+    distance_matrix: np.ndarray,
+    coords: np.ndarray | None = None,
+) -> tuple[list[int], list[TraceStep]]:
+    tour, insert_steps = v01_baseline.solve_from_hull_traced(
+        hull, remaining, distance_matrix, coords
+    )
+    final_tour = _parallel_native_ils(tour, distance_matrix)
+    return final_tour, insert_steps
+
+
+def _run_chain(args) -> tuple[list[int], float]:
+    base_tour, dist, neighbors, iters, seed, init_kick = args
+    best = ils_run_c(
+        base_tour, dist, neighbors,
+        iterations=iters, seed=seed,
+        init_kick=init_kick,
+        or_opt_chain_lengths=_OR_OPT_LENGTHS,
+        use_3opt=False,
+    )
+    return best, compute_tour_cost(best, dist)
+
+
+def _polish(args) -> tuple[list[int], float]:
+    tour, dist = args
+    polished, _ = compound_local_search(
+        list(tour), dist, or_opt_chain_lengths=_OR_OPT_LENGTHS
+    )
+    return polished, compute_tour_cost(polished, dist)
+
+
+def _parallel_native_ils(initial_tour: list[int], dist) -> list[int]:
+    n = len(initial_tour)
+    chains, iters = _budget(n)
+    k = min(_NEIGHBOR_K, n - 1)
+    neighbors = build_neighbor_lists(dist, k=k)
+
+    n_workers = min(chains, os.cpu_count() or 4)
+    payloads = [
+        (
+            initial_tour, dist, neighbors, iters,
+            _BASE_SEED + s * 1_000_003,
+            s != 0,  # chain 0 starts from base; others diversify with a kick
+        )
+        for s in range(chains)
+    ]
+
+    if n_workers <= 1 or n <= 50:
+        results = [_run_chain(p) for p in payloads]
+    else:
+        with mp.get_context("spawn").Pool(processes=n_workers) as pool:
+            results = pool.map(_run_chain, payloads)
+
+    # Polish every chain's best with the full O(n²) compound LS (cheap
+    # relative to the ILS itself) then keep the global minimum.
+    if n <= 1500:
+        polish_payloads = [(t, dist) for t, _ in results]
+        if n_workers <= 1 or n <= 50:
+            polished = [_polish(p) for p in polish_payloads]
+        else:
+            with mp.get_context("spawn").Pool(processes=n_workers) as pool:
+                polished = pool.map(_polish, polish_payloads)
+        results = polished
+
+    overall_best, _ = min(results, key=lambda x: x[1])
+    return overall_best
